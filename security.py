@@ -11,7 +11,7 @@ import os
 # Security configuration
 SECRET_KEY = os.getenv("JWT_SECRET","fallbacksecretkey")  # Use a secure method to set this in production
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
 API_KEY =os.getenv("API_KEY","fallback -api-key")  # Update this to your new API key
 
 # Security schemes
