@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Database files
+demo.db
+
+# Virtual environment
+fastapienv/
+
+# Alembic cache
+alembic/__pycache__/
+
+# Uploads and user files
+uploads/
+
+# VSCode settings
+.vscode/
+
+# OS files
+*.DS_Store
+Thumbs.db
+
+# Python env files
+.env
+
+# Pytest cache
+.pytest_cache/
+
+# Misc
+*.log
+
