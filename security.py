@@ -6,12 +6,13 @@ from fastapi import HTTPException, status, Depends, Security
 from sqlalchemy.orm import Session
 import models
 from database import get_db
+import os
 
 # Security configuration
-SECRET_KEY = "super-secret"
+SECRET_KEY = os.getenv("JWT_SECRET","fallbacksecretkey")  # Use a secure method to set this in production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-API_KEY = "apixkeyaawpqsrtu"  # Update this to your new API key
+API_KEY =os.getenv("API_KEY","fallback -api-key")  # Update this to your new API key
 
 # Security schemes
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
