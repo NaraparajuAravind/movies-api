@@ -394,6 +394,14 @@ def download_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict 
 
     return FileResponse(path=movie_file.filepath, filename=movie_file.filename)
 
+# ---Health Check---
+
+Health_router = APIRouter(prefix="/health", tags=["Health"])
+
+@Health_router.get("/")
+def health_check():
+    return {"status": "API is up and running"}
+
 # --- Main App ---
 app = FastAPI(
     title="Movies API",
@@ -406,3 +414,5 @@ app.include_router(users_router)
 app.include_router(movies_router)
 
 app.include_router(files_router)
+
+app.include_router(Health_router)
