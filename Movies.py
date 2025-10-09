@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Path, Query, Security, Form,File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 import models, schemas
@@ -408,7 +409,13 @@ app = FastAPI(
     description="API for managing movies and users with role-based access.",
     version="1.0.0"
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust this to your needs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(movies_router)
