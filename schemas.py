@@ -12,6 +12,7 @@ class MovieCreate(BaseModel):
     rating: float = Field(ge=0.0,le=10.0)
 
 
+
 class MovieOut(MovieCreate):
     id: int
     class Config:

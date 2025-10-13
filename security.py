@@ -9,17 +9,17 @@ from database import get_db
 import os
 
 # Security configuration
-SECRET_KEY = os.getenv("JWT_SECRET","fallbacksecretkey")  # Use a secure method to set this in production
+SECRET_KEY = "suepersecretkey"  # Change this to a strong secret key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
-API_KEY =os.getenv("API_KEY","fallback -api-key")  # Update this to your new API key
+API_KEY ="apireadxyznew" # Update this to your new API key
 
 # Security schemes
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
 
 def verify_api_key(api_key: str = Security(api_key_header)):
-    if api_key != API_KEY:
+    if api_key!= API_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API key"
