@@ -10,6 +10,8 @@ class Users(Base):
     role_id = Column(Integer, ForeignKey("roles.id"))
     role_obj = relationship("Role", back_populates="users")
 
+    movie_assignments = relationship("MovieAssignment", back_populates="user")
+
 
 class Role(Base):
     __tablename__ = "roles"
@@ -31,12 +33,17 @@ class Movie(Base):
     rating = Column(Float)
     created_by=Column(Integer, ForeignKey("users.id"))
     creator= relationship("Users")
+    assignments = relationship("MovieAssignment", back_populates="movie")
 
 class MovieAssignment(Base):
     __tablename__ = "movie_assignments"
     id = Column(Integer, primary_key=True,index=True)
     movie_id = Column(Integer, ForeignKey("movies.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+
+    movie = relationship("Movie", back_populates="assignments")
+    user = relationship("Users", back_populates="movie_assignments")
+
 class MovieFile(Base):
     __tablename__ = "movie_files"
     id = Column(Integer, primary_key=True,index=True)

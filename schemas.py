@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Optional
 
 CURRENT_YEAR = datetime.now().year
 
@@ -49,3 +50,15 @@ class MovieFileOut(BaseModel):
     uploaded_by: int
     class Config:
         orm_mode = True
+
+class UserAssignmentOut(BaseModel):
+    user_id: int
+    user_name: str
+    movie_id: int
+    movie_title: str
+    assigned_by: str
+    assigned_date: Optional[datetime]=None
+    class Config:
+        orm_mode = True
+
+
