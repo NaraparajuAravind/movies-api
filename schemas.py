@@ -17,7 +17,7 @@ class MovieCreate(BaseModel):
 class MovieOut(MovieCreate):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=3)
@@ -29,7 +29,7 @@ class UserOut(BaseModel):
     username: str
     role: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -49,7 +49,7 @@ class MovieFileOut(BaseModel):
     movie_id: int
     uploaded_by: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserAssignmentOut(BaseModel):
     user_id: int
@@ -59,6 +59,6 @@ class UserAssignmentOut(BaseModel):
     assigned_by: str
     assigned_date: Optional[datetime]=None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
