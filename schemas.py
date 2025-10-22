@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -16,8 +16,7 @@ class MovieCreate(BaseModel):
 
 class MovieOut(MovieCreate):
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=3)
@@ -28,8 +27,7 @@ class UserOut(BaseModel):
     id:int
     username: str
     role: str
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class Token(BaseModel):
     access_token: str
@@ -48,8 +46,7 @@ class MovieFileOut(BaseModel):
     source: str
     movie_id: int
     uploaded_by: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserAssignmentOut(BaseModel):
     user_id: int
@@ -58,7 +55,6 @@ class UserAssignmentOut(BaseModel):
     movie_title: str
     assigned_by: str
     assigned_date: Optional[datetime]=None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 

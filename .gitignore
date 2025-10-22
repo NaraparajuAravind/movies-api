@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 
 # Database files
-App.db
+AppDemo.db
 
 # Virtual environment
 fastapienv/
