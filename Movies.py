@@ -1,8 +1,8 @@
-
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Path, Query, Security, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 import models, schemas
 from database import get_db
 from security import hashed_password, verify_password, create_access_token, verify_api_key, verify_token
@@ -78,7 +78,7 @@ def get_all_users(db: Session = Depends(get_db), auth: dict = Depends(authorize)
     role = auth["role"]
     query = db.query(models.Users).join(models.Role, models.Users.role_id == models.Role.id)
     if role == "viewer":
-        query = query.filter(models.Role.name == "viewer")
+        query = query.filter(models.Role.name == "viewer", models.Users.id == auth.get("user_id"))
     elif role == "editor":
         query = query.filter(models.Role.name.in_(["viewer", "editor"]))
     elif role == "admin":
@@ -158,7 +158,8 @@ def create_movie(movie: schemas.MovieCreate, db: Session = Depends(get_db), auth
     else:
         users = db.query(models.Users).join(models.Role).filter(models.Role.name.in_(["admin", "super admin"])).all()
     for user in users:
-        db.add(models.MovieAssignment(movie_id=db_movie.id, user_id=user.id))
+        # mark initial auto-assignments as created by the movie creator
+        db.add(models.MovieAssignment(movie_id=db_movie.id, user_id=user.id, assigned_by=auth["user_id"]))
     db.commit()
     return db_movie
 
@@ -178,6 +179,62 @@ def get_all_movies(db: Session = Depends(get_db), auth: dict = Depends(authorize
             (models.Movie.id.in_(movie_ids)) | (models.Movie.created_by == user_id)
         ).all()
     return movies
+
+@movies_router.get('/user-assignments',response_model=list[schemas.UserAssignmentOut])
+def get_user_assignments(db: Session = Depends(get_db), auth: dict = Depends(authorize)):
+    role = auth["role"]
+    user_id = auth["user_id"]
+    query = db.query(models.MovieAssignment).join(
+        models.Users, models.MovieAssignment.user_id == models.Users.id
+    ).join(
+        models.Movie, models.MovieAssignment.movie_id == models.Movie.id
+    ).join(
+        models.Role, models.Users.role_id == models.Role.id
+    )
+    # Role-based visibility rules for assignments:
+    # - viewer: see assignments for users with role 'viewer'
+    # - editor: see assignments for users with role 'editor'
+    # - admin: see assignments for non-super-admin users, plus any assignments related to movies the admin created or assignments the admin made
+    # - super admin: see all assignments
+    if role == "viewer":
+        query = query.filter(models.Role.name == "viewer")  # fetch only viewer assignments
+    elif role == "editor":
+        query = query.filter(models.Role.name == "editor")  # fetch only editor assignments
+    elif role == "admin":
+        # Admins can see assignments for users except super admins, but also must see assignments for movies
+        # they created and assignments they personally made.
+        query = query.filter(
+            or_(
+                models.Role.name != "super admin",
+                models.Movie.created_by == user_id,
+                models.MovieAssignment.assigned_by == user_id,
+            )
+        )
+
+    assignments = query.all() #super admin can see all assignments
+    result = []
+    for assignment in assignments:
+        # Determine assigned_by name; prefer the explicit assigned_by_user, otherwise fall back to the movie creator
+        assigned_by_name = None
+        try:
+            if getattr(assignment, 'assigned_by_user', None) and assignment.assigned_by_user:
+                assigned_by_name = assignment.assigned_by_user.username
+            else:
+                # if there is no explicit assigned_by, use the movie creator (useful for initial auto-assignments)
+                if getattr(assignment, 'movie', None) and getattr(assignment.movie, 'creator', None):
+                    assigned_by_name = assignment.movie.creator.username
+        except Exception:
+            assigned_by_name = None
+
+        result.append({
+            "user_id": assignment.user_id,
+            "username": assignment.user.username,
+            "movie_id": assignment.movie_id,
+            "movie_title": assignment.movie.title,
+            "assigned_by": assigned_by_name,
+            #"assigned_date": assignment.assigned_date
+        })
+    return result
 
 
 @movies_router.get("/{movie_id}", response_model=schemas.MovieOut)
@@ -227,7 +284,11 @@ def assign_movie(movie_id: int, user_id: int, is_assigned: bool, db: Session = D
     if is_assigned:
         if assignment:
             raise HTTPException(status_code=400, detail="Movie already assigned to user")
-        new_assignment = models.MovieAssignment(movie_id=movie_id, user_id=user_id)
+        new_assignment = models.MovieAssignment(
+            movie_id=movie_id,
+            user_id=user_id,
+            assigned_by=auth["user_id"]
+        )
         db.add(new_assignment)
         db.commit()
         return {"message": "Movie assigned to user successfully"}
@@ -283,6 +344,7 @@ def delete_movie(movie_id: int, db: Session = Depends(get_db), auth: dict = Depe
     db.commit()
 
 
+
 # --- Files Section ---
 files_router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -332,13 +394,13 @@ async def upload_movie_files(
     # Create absolute path to avoid relative path issues
     save_path = os.path.abspath(os.path.join(UPLOAD_DIR, file.filename))
 
-    #print(f"💾 Saving file to: {save_path}")
-    #print(f"📁 Upload directory: {os.path.abspath(UPLOAD_DIR)}")
+    print(f"💾 Saving file to: {save_path}")
+    print(f"📁 Upload directory: {os.path.abspath(UPLOAD_DIR)}")
 
     try:
         with open(save_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        #print(f"✅ File saved successfully: {save_path}")
+        print(f"✅ File saved successfully: {save_path}")
 
         # Verify file was saved
         if os.path.exists(save_path):
@@ -394,63 +456,6 @@ def get_movie_files(movie_id: int, source: str | None = Query(default=None), db:
         query = query.filter_by(source=source)
     return query.all()
 
-@files_router.get("/getuserfiles/{user_id}", response_model=list[schemas.MovieFileOut])
-def get_user_files(user_id: int, db: Session = Depends(get_db), auth: dict = Depends(authorize)):
-    role = auth["role"]
-    requester_id = auth["user_id"]
-
-    requester = db.query(models.Users).filter_by(id=requester_id).first()
-    target_user = db.query(models.Users).filter_by(id=user_id).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Target user not found")
-
-    # Get movie IDs assigned to the requester
-    assigned_movie_ids = db.query(models.MovieAssignment.movie_id).filter_by(user_id=requester_id).all()
-    movie_ids = [m.movie_id for m in assigned_movie_ids]
-
-    # Super Admin: full access
-    if role == "super admin":
-        return db.query(models.MovieFile).all()
-
-    # Viewer: view files for assigned movies only
-    if role == "viewer":
-        if user_id != requester_id:
-            raise HTTPException(status_code=403, detail="Viewers can only access their own assigned movie files")
-        return db.query(models.MovieFile).filter(models.MovieFile.movie_id.in_(movie_ids)).all()
-
-    # Editor: view files for assigned movies uploaded by self, admin, or super admin
-    if role == "editor":
-        if user_id != requester_id:
-            raise HTTPException(status_code=403, detail="Editors can only access their own assigned movie files")
-        allowed_roles = ["editor", "admin", "super admin"]
-        return db.query(models.MovieFile).join(models.Users, models.MovieFile.uploaded_by == models.Users.id)\
-            .filter(models.MovieFile.movie_id.in_(movie_ids))\
-            .filter(models.Users.role_obj.name.in_(allowed_roles)).all()
-
-    # Admin: view files for assigned movies, excluding super admin uploads unless assigned by super admin
-    if role == "admin":
-        # Get all files for assigned movies
-        files = db.query(models.MovieFile).join(models.Users, models.MovieFile.uploaded_by == models.Users.id)\
-            .filter(models.MovieFile.movie_id.in_(movie_ids)).all()
-
-        # Filter out super admin uploads unless the movie was assigned by a super admin
-        filtered_files = []
-        for file in files:
-            uploader = db.query(models.Users).filter_by(id=file.uploaded_by).first()
-            if uploader.role_obj.name != "super admin":
-                filtered_files.append(file)
-            else:
-                # Check if movie was assigned to admin by super admin
-                assignment = db.query(models.MovieAssignment).filter_by(
-                    user_id=requester_id, movie_id=file.movie_id, assigned_by=uploader.id
-                ).first()
-                if assignment:
-                    filtered_files.append(file)
-
-        return filtered_files
-
-    raise HTTPException(status_code=403, detail="Invalid role or insufficient permissions")
-
 
 @files_router.get("/images/{file_id}")
 def get_image_file(file_id: int, db: Session = Depends(get_db)):
@@ -476,18 +481,18 @@ def get_image_file(file_id: int, db: Session = Depends(get_db)):
 
             # Try to find the file using just the filename in uploads directory
             alternative_path = os.path.join(UPLOAD_DIR, movie_file.filename)
-            #print(f"🔄 Trying alternative path: {alternative_path}")
+            print(f"🔄 Trying alternative path: {alternative_path}")
 
             if os.path.exists(alternative_path):
-                #print("✅ Found file at alternative path!")
+                print("✅ Found file at alternative path!")
                 # Update the database with correct path
                 movie_file.filepath = alternative_path
                 db.commit()
             else:
-                #print("❌ File not found anywhere")
+                print("❌ File not found anywhere")
                 # List all files in uploads directory for debugging
                 upload_files = os.listdir(UPLOAD_DIR)
-                #print(f"📂 Files in uploads directory: {upload_files}")
+                print(f"📂 Files in uploads directory: {upload_files}")
                 raise HTTPException(status_code=404, detail="File not found on server")
 
         # Determine content type based on file extension
@@ -511,7 +516,7 @@ def get_image_file(file_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        #print(f"❌ Error serving image {file_id}: {str(e)}")
+        print(f"❌ Error serving image {file_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -597,7 +602,7 @@ def debug_files(db: Session = Depends(get_db)):
     return result
 
 
-'''@files_router.post("/fix-file-paths")
+@files_router.post("/fix-file-paths")
 def fix_file_paths(db: Session = Depends(get_db)):
     """Fix file paths for existing records"""
     files = db.query(models.MovieFile).all()
@@ -613,7 +618,7 @@ def fix_file_paths(db: Session = Depends(get_db)):
                 fixed_count += 1
 
     db.commit()
-    return {"message": f"Fixed {fixed_count} file paths"}'''
+    return {"message": f"Fixed {fixed_count} file paths"}
 
 
 # ---Health Check---

@@ -50,11 +50,9 @@ class MovieFileOut(BaseModel):
 
 class UserAssignmentOut(BaseModel):
     user_id: int
-    user_name: str
+    username: str
     movie_id: int
     movie_title: str
-    assigned_by: str
-    assigned_date: Optional[datetime]=None
+    assigned_by: Optional[str] = None
+    #assigned_date: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
-
-

@@ -10,7 +10,9 @@ class Users(Base):
     role_id = Column(Integer, ForeignKey("roles.id"))
     role_obj = relationship("Role", back_populates="users")
 
-    movie_assignments = relationship("MovieAssignment", back_populates="user")
+    # movie_assignments/backrefs are created on MovieAssignment side to disambiguate two FKs to Users
+    # Users will have: .movie_assignments (assignments where they are the assignee)
+    # and .assignments_made (assignments they created) via backrefs defined below.
 
 
 class Role(Base):
@@ -32,17 +34,22 @@ class Movie(Base):
     year = Column(Integer)
     rating = Column(Float)
     created_by=Column(Integer, ForeignKey("users.id"))
-    creator= relationship("Users")
-    assignments = relationship("MovieAssignment", back_populates="movie")
+    # make creator relationship explicit about which FK on this table refers to Users
+    creator= relationship("Users", foreign_keys=[created_by])
+    assignments = relationship("MovieAssignment", back_populates="movie", cascade="all, delete-orphan")
 
 class MovieAssignment(Base):
     __tablename__ = "movie_assignments"
     id = Column(Integer, primary_key=True,index=True)
     movie_id = Column(Integer, ForeignKey("movies.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+    assigned_by = Column(Integer,ForeignKey("users.id"))
 
     movie = relationship("Movie", back_populates="assignments")
-    user = relationship("Users", back_populates="movie_assignments")
+    # relationship to the user who is assigned (assignee)
+    user = relationship("Users", backref="movie_assignments", foreign_keys=[user_id])
+    # relationship to the user who performed the assignment
+    assigned_by_user = relationship("Users", backref="assignments_made", foreign_keys=[assigned_by])
 
 class MovieFile(Base):
     __tablename__ = "movie_files"
