@@ -168,16 +168,24 @@ def create_movie(movie: schemas.MovieCreate, db: Session = Depends(get_db), auth
 def get_all_movies(db: Session = Depends(get_db), auth: dict = Depends(authorize)):
     role = auth["role"]
     user_id = auth["user_id"]
+    # viewer/editor: only assigned movies
     if role in ["viewer", "editor"]:
         assignments = db.query(models.MovieAssignment).filter_by(user_id=user_id).all()
         movie_ids = [assignment.movie_id for assignment in assignments]
         movies = db.query(models.Movie).filter(models.Movie.id.in_(movie_ids)).all()
-    else:
+    elif role == "admin":
+        # Admins see movies created by any admin users (including themselves) and movies assigned to them
+        # collect assigned movie ids
         assignments = db.query(models.MovieAssignment).filter_by(user_id=user_id).all()
         movie_ids = [assignment.movie_id for assignment in assignments]
+        # find all admin user ids
+        admin_user_ids = [r.id for r in db.query(models.Users).join(models.Role).filter(models.Role.name == "admin").all()]
         movies = db.query(models.Movie).filter(
-            (models.Movie.id.in_(movie_ids)) | (models.Movie.created_by == user_id)
+            (models.Movie.created_by.in_(admin_user_ids)) | (models.Movie.id.in_(movie_ids))
         ).all()
+    else:
+        # super admin: see all movies
+        movies = db.query(models.Movie).all()
     return movies
 
 @movies_router.get('/user-assignments',response_model=list[schemas.UserAssignmentOut])
@@ -548,7 +556,6 @@ def delete_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict = 
     db.delete(movie_file)
     db.commit()
 
-
 @files_router.get("/download/{file_id}")
 def download_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict = Depends(authorize)):
     role = auth["role"]
@@ -628,6 +635,7 @@ Health_router = APIRouter(prefix="/health", tags=["Health"])
 @Health_router.get("/")
 def health_check():
     return {"status": "API is up and running"}
+
 
 
 # --- Main App ---
