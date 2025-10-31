@@ -73,7 +73,7 @@ async def authorize(
 users_router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@users_router.get("/", response_model=list[schemas.UserOut])
+@users_router.get("", response_model=list[schemas.UserOut])
 def get_all_users(db: Session = Depends(get_db), auth: dict = Depends(authorize)):
     role = auth["role"]
     query = db.query(models.Users).join(models.Role, models.Users.role_id == models.Role.id)
@@ -164,7 +164,7 @@ def create_movie(movie: schemas.MovieCreate, db: Session = Depends(get_db), auth
     return db_movie
 
 
-@movies_router.get("/", response_model=list[schemas.MovieOut])
+@movies_router.get("", response_model=list[schemas.MovieOut])
 def get_all_movies(db: Session = Depends(get_db), auth: dict = Depends(authorize)):
     role = auth["role"]
     user_id = auth["user_id"]
@@ -437,7 +437,7 @@ async def upload_movie_files(
     return movie_file
 
 
-@files_router.get("/movies/{movie_id}/files", response_model=list[schemas.MovieFileOut])
+@files_router.get("movies/{movie_id}/files", response_model=list[schemas.MovieFileOut])
 def get_movie_files(movie_id: int, source: str | None = Query(default=None), db: Session = Depends(get_db),
                     auth: dict = Depends(authorize)):
     role = auth["role"]
@@ -465,7 +465,7 @@ def get_movie_files(movie_id: int, source: str | None = Query(default=None), db:
     return query.all()
 
 
-@files_router.get("/images/{file_id}")
+@files_router.get("images/{file_id}")
 def get_image_file(file_id: int, db: Session = Depends(get_db)):
     """
     Public endpoint for serving images
@@ -556,7 +556,7 @@ def delete_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict = 
     db.delete(movie_file)
     db.commit()
 
-@files_router.get("/download/{file_id}")
+@files_router.get("download/{file_id}")
 def download_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict = Depends(authorize)):
     role = auth["role"]
     user_id = auth["user_id"]
@@ -583,7 +583,7 @@ def download_movie_file(file_id: int, db: Session = Depends(get_db), auth: dict 
 
 
 # Debug endpoints
-@files_router.get("/debug/files")
+@files_router.get("debug/files")
 def debug_files(db: Session = Depends(get_db)):
     """Debug endpoint to check all files and their paths"""
     files = db.query(models.MovieFile).all()
@@ -609,7 +609,7 @@ def debug_files(db: Session = Depends(get_db)):
     return result
 
 
-@files_router.post("/fix-file-paths")
+@files_router.post("fix-file-paths")
 def fix_file_paths(db: Session = Depends(get_db)):
     """Fix file paths for existing records"""
     files = db.query(models.MovieFile).all()
@@ -632,7 +632,7 @@ def fix_file_paths(db: Session = Depends(get_db)):
 Health_router = APIRouter(prefix="/health", tags=["Health"])
 
 
-@Health_router.get("/")
+@Health_router.get("")
 def health_check():
     return {"status": "API is up and running"}
 

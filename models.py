@@ -10,9 +10,27 @@ class Users(Base):
     role_id = Column(Integer, ForeignKey("roles.id"))
     role_obj = relationship("Role", back_populates="users")
 
-    # movie_assignments/backrefs are created on MovieAssignment side to disambiguate two FKs to Users
-    # Users will have: .movie_assignments (assignments where they are the assignee)
-    # and .assignments_made (assignments they created) via backrefs defined below.
+    # explicit relationships to disambiguate two FKs from MovieAssignment to Users
+    # assignments where this user is the assignee
+    movie_assignments = relationship(
+        "MovieAssignment",
+        foreign_keys="[MovieAssignment.user_id]",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # assignments created/made by this user
+    assignments_made = relationship(
+        "MovieAssignment",
+        foreign_keys="[MovieAssignment.assigned_by]",
+        back_populates="assigned_by_user",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def role(self):
+        """Expose a `role` attribute for Pydantic response models (returns role name)."""
+        return self.role_obj.name if self.role_obj else None
 
 
 class Role(Base):
@@ -47,9 +65,9 @@ class MovieAssignment(Base):
 
     movie = relationship("Movie", back_populates="assignments")
     # relationship to the user who is assigned (assignee)
-    user = relationship("Users", backref="movie_assignments", foreign_keys=[user_id])
+    user = relationship("Users", foreign_keys=[user_id], back_populates="movie_assignments")
     # relationship to the user who performed the assignment
-    assigned_by_user = relationship("Users", backref="assignments_made", foreign_keys=[assigned_by])
+    assigned_by_user = relationship("Users", foreign_keys=[assigned_by], back_populates="assignments_made")
 
 class MovieFile(Base):
     __tablename__ = "movie_files"
@@ -60,3 +78,5 @@ class MovieFile(Base):
     source = Column(String,nullable=False)
     movie_id = Column(Integer, ForeignKey("movies.id"))
     uploaded_by = Column(Integer, ForeignKey("users.id"))
+    # optional relationship to uploader
+    uploaded_user = relationship("Users", foreign_keys=[uploaded_by])
